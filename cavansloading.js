@@ -10,12 +10,12 @@ function merge(object_1, object_2) {
 			if(typeof o1[i] == 'object' && typeof o2[i] == 'object'){
 				delete arr[i];
 				var t = i;
-				var m = merge(o1[i],o2[i]);
+				var m = merge(o2[i]);
 				i = t;
 				arr[i] = m;
 			}
 			else{
-				arr[i] = o2[i];
+				arr[i] = getCorrectValue(o2[i]);
 			}
 			delete o2[i];
 		}
@@ -23,10 +23,34 @@ function merge(object_1, object_2) {
 			arr[i] = o1[i];
 	}
 
-	for(i in o2)
-		arr[i] = o2[i];
+	for(i in o2){	
+		arr[i] = getCorrectValue(o2[i]);
+	}
 
 	return arr;
+}
+
+function getCorrectValue(val){
+	if(typeof val == "string")
+	{
+		if(!isNaN(parseFloat(val)) && isFinite(val))
+			return parseFloat(val);
+		else if(stringToBoolean(val) != -1)
+			return stringToBoolean(val);
+		else
+			return val;
+	}
+	else if(typeof val == "object")
+		return val;
+	return val;
+}
+
+function stringToBoolean(string){
+	switch(string.toLowerCase()){
+		case "true": case "yes": case "1": return true;
+		case "false": case "no": case "0": case null: return false;
+	}
+	return -1;
 }
 
 function contains(a, obj) {
@@ -39,7 +63,7 @@ function contains(a, obj) {
 }
 
 function isNull(obj){
-	return obj === false || typeof obj == 'undefined';
+	return obj === false || typeof obj == 'undefined' || obj == null;
 }
 
 // FOR DEBUGGING
@@ -58,19 +82,18 @@ function LOG (args) {
 	}
 }
 
-
-/*
-	TODO :
-	- gérer le loading indéterminé
-	- 
-
-*/
 function CanvasLoading(selector, options) {
 	if(! ( options && typeof options == "object" ))
 		options = false;
 
 	this.element = document.querySelector(selector);
-	this.options = merge(this.default,options);
+	if(isNull(this.element)) {
+		throw new Error("The selector aims to a null object.");
+		return false;
+	}
+
+	this.options = merge(CanvasLoading.defaults,options);
+	var htmlOptions = merge(options,this.getOptions());
 	this.type = this.getType();
 	this.loop = false;
 
@@ -81,18 +104,19 @@ function CanvasLoading(selector, options) {
 	this.progress = 0;
 
 	this.init();
+	return true;
 }
 
 CanvasLoading.config = {
 	'prefix' 			: 'cnvldg',
+	'prefixOptions'		: 'cl-opt',
 	'delimiterPrefix'	: '-',
 	'rate'				: 15,	
 	'animationrate'		: 5	
 }
 
-CanvasLoading.prototype.default = {
+CanvasLoading.defaults = {
 	'standAlone'	: true,
-	'radius' 		: 15,
 	'longer' 		: 10,
 	'weight' 		: 5,
 	'animationStart': true,
@@ -115,9 +139,9 @@ CanvasLoading.TypesEffect = {
 CanvasLoading.prototype.init = function() {
 	this.canvas = document.createElement('canvas');
 	this.canvas.className = CanvasLoading.config.prefix;
-	this.canvas.width = this.options.width;
-	this.canvas.height = this.options.height;
+
 	this.title = this.element.innerHTML;
+
 	var span = document.createElement('span');
 	span.className = CanvasLoading.config.prefix+CanvasLoading.config.delimiterPrefix+"title";
 	span.innerHTML = this.title;
@@ -129,8 +153,39 @@ CanvasLoading.prototype.init = function() {
 	this.context2D = this.canvas.getContext('2d');
 
 	this.effect.init(this);
+	this.resizeCanvas();
 	window.onresize = this.effect.resizeCanvas;
-	window.onload = this.effect.resizeCanvas;
+};
+
+CanvasLoading.prototype.resizeCanvas = function() {
+	if(this.canvas.width != this.options.width)
+		this.canvas.width = this.options.width;
+	if(this.canvas.height != this.options.height)
+		this.canvas.height = this.options.height;
+	this.options.radius = Math.max(0,this.options.width/2 - this.options.weight/2);
+	if(!isNull(this.effect.resizeCanvas))
+		this.effect.resizeCanvas();
+};
+
+CanvasLoading.prototype.getOptions = function() {
+	var classes = this.element.className.split(' ');
+	var newClass = [];
+	for(var c in classes) {
+		var cls = classes[c];
+		var indOpt = cls.search(CanvasLoading.config.prefixOptions);
+		if(indOpt > -1){
+			var option = cls.substring(( CanvasLoading.config.prefixOptions + CanvasLoading.config.delimiterPrefix ).length);
+			var optionName = option.substring(0,option.search(':'));
+			var optionValue = option.substring(option.search(':')+1);
+
+			this.setOption(optionName,optionValue);
+		}
+		else newClass.push(cls);
+	}
+	if(newClass.length == 0)
+		this.element.removeAttribute('class');
+	else
+		this.element.className = newClass.join(' ').trim();
 };
 
 CanvasLoading.prototype.setOption = function(option,value) {
@@ -153,7 +208,7 @@ CanvasLoading.prototype.show = function(time) {
 	this.startTime = new Date().getTime();
 
 	if(time && typeof time == "number"){
-		if(time > this.options.animationTime && this.options.standAlone){
+		if(time > this.options.animationTime){
 			time = Math.abs(parseInt(time));
 			this.options.duration = time;
 			setTimeout(function() {
@@ -179,6 +234,8 @@ CanvasLoading.prototype.show = function(time) {
 					that.hide();
 			}
 		}, CanvasLoading.config.animationrate);
+	} else {
+		this.start();
 	}
 };
 
@@ -197,6 +254,8 @@ CanvasLoading.prototype.hide = function() {
 				that.stop();
 			}
 		} , CanvasLoading.config.animationrate);
+	} else {
+		this.stop();
 	}
 };
 
@@ -205,6 +264,7 @@ CanvasLoading.prototype.start = function() {
 	this.stop();
 	this.launchBegin();
 	this.loop = setInterval(function(){
+		that.resizeCanvas();
 		that.paint();
 	},CanvasLoading.config.rate);
 }
@@ -217,7 +277,12 @@ CanvasLoading.prototype.stop = function() {
 }
 
 CanvasLoading.prototype.paint = function() {
-	this.effect.paint(this.context2D);
+	if(typeof this.effect.paint != "undefined")
+		this.effect.paint(this.context2D);
+	else {
+		this.stop();
+		throw new Error("No paint implemented the "+this.type.toLowerCase()+" effect.");
+	}
 }
 
 CanvasLoading.prototype.getType = function() {
@@ -358,9 +423,8 @@ function CircleEffect(){
 		'fill' 				: false
 	};
 
-	var that;
+	var that = this;
 	CircleEffect.prototype.init = function(object) {
-		that = this;
 		this.object = object;
 		this.config = merge(this.config,this.object.options);
 		this.context = object.context2D;
@@ -370,28 +434,29 @@ function CircleEffect(){
 	CircleEffect.prototype.resizeCanvas = function(obj) {};
 
 	CircleEffect.prototype.paint = function(context) {
-		context.fillStyle = this.object.options.clear;
-		context.fillRect(0,0,this.object.canvas.width,this.object.canvas.height);
+		context.clearRect(0,0,this.object.canvas.width,this.object.canvas.height);
 		if(this.object.options.standAlone)
 			this.setNextProgress();
 
+		var angleB, angleE;
+
 		if(this.config.counterclockwise){
 			if(this.getProgress() <= 0.5){
-				var angleB = this.config.startAngle;
-				var angleE = angleB-this.object.getProgress()*4*Math.PI;
+				angleB = this.config.startAngle;
+				angleE = angleB-this.object.getProgress()*4*Math.PI;
 			}
 			else {	
-				var angleE = this.config.startAngle;
-				var angleB = angleE-this.object.getProgress()*4*Math.PI;
+				angleE = this.config.startAngle;
+				angleB = angleE-this.object.getProgress()*4*Math.PI;
 			}
 		} else {
 			if(this.getProgress() <= 0.5){
-				var angleE = this.config.startAngle;
-				var angleB = angleE+this.object.getProgress()*4*Math.PI;
+				angleE = this.config.startAngle;
+				angleB = angleE+this.object.getProgress()*4*Math.PI;
 			}
 			else {	
-				var angleB = this.config.startAngle;
-				var angleE = angleB+this.object.getProgress()*4*Math.PI;
+				angleB = this.config.startAngle;
+				angleE = angleB+this.object.getProgress()*4*Math.PI;
 			}
 		}
 		
@@ -400,21 +465,34 @@ function CircleEffect(){
 				(this.getProgress() > 0.5 ? 1-this.getProgress() : this.getProgress()) 
 				: 1);
 
-		//BackColor
-		context.beginPath();
-		context.arc(this.object.options.width/2,this.object.options.height/2,
-			this.object.options.radius,0,2*Math.PI);
-		context.strokeStyle = this.object.options.backColor;
-		context.stroke();
-
-		context.beginPath();
-		context.arc(this.object.options.width/2,this.object.options.height/2,
-			this.object.options.radius,angleB,angleE,true);
 		if(this.config.fill == false) {
-			context.strokeStyle = "#333";
+			context.beginPath();
+			context.arc(this.object.options.width/2,this.object.options.height/2,
+				this.object.options.radius,0,2*Math.PI);
+			context.strokeStyle = this.object.options.backColor;
+			context.stroke();
+			context.closePath();
+
+			context.beginPath();
+			context.arc(this.object.options.width/2,this.object.options.height/2,
+				this.object.options.radius,angleB,angleE,true);
+			context.strokeStyle = this.object.options.frontColor;
 			context.stroke();
 		} else {
-			context.fillStyle = "#ccc";
+			context.beginPath();
+			context.arc(this.object.options.width/2,this.object.options.height/2,
+				this.object.options.radius,0,2*Math.PI);
+			context.lineTo(this.object.options.width/2,this.object.options.height/2);
+			context.fillStyle = this.object.options.backColor;
+			context.closePath();
+			context.fill();
+
+			context.beginPath();
+			context.arc(this.object.options.width/2,this.object.options.height/2,
+				this.object.options.radius,angleB,angleE,true);
+			context.lineTo(this.object.options.width/2,this.object.options.height/2);
+			context.fillStyle = this.object.options.frontColor;
+			context.closePath();
 			context.fill();
 		}
 	};
@@ -443,16 +521,109 @@ function CircleEffect(){
 }
 
 function RectangleEffect(){
+	this.config = {
+		'direction'	: 'right'
+	};
+
+	var that = this;
 	RectangleEffect.prototype.init = function(object) {
-		
+		this.object = object;
+		this.config = merge(this.object.options,this.config);
 	};
 
-	RectangleEffect.prototype.resizeCanvas = function(obj) {
-
-	};
+	RectangleEffect.prototype.resizeCanvas = function(obj) {};
 
 	RectangleEffect.prototype.paint = function(context) {
-		
+		context.clearRect(0,0,this.object.canvas.width,this.object.canvas.height);
+		if(this.object.options.standAlone)
+			this.setNextProgress();
+
+		var left, top, width, height;
+		var direction = this.config.direction;
+		switch(direction) {
+			case 'right':
+			case 'left':
+				top = 0;
+				height = this.object.options.height;
+				if(this.getProgress() <= 0.5){
+					left = direction == 'left' ? (1 - this.object.getProgress() * 2) * this.object.options.width : 0;
+					width = this.object.getProgress() * 2 * this.object.options.width;
+				}
+				else {	
+					left = direction == 'left' ? 0 : (this.object.getProgress()-0.5) * 2 * this.object.options.width;
+					width = (1 - (this.object.getProgress() - 0.5) * 2) * this.object.options.width;
+				}
+			break;
+			case 'top':
+			case 'bottom':
+				left = 0;
+				width = this.object.options.width;
+				if(this.getProgress() <= 0.5){
+					top = direction == 'top' ? (1 - this.object.getProgress() * 2) * this.object.options.height : 0;
+					height = this.object.getProgress() * 2 * this.object.options.height;
+				}
+				else {	
+					top = direction == 'top' ? 0 : (this.object.getProgress()-0.5) * 2 * this.object.options.height;
+					height = (1 - (this.object.getProgress() - 0.5) * 2) * this.object.options.height;
+				}
+			break;
+		}
+				
+		context.lineWidth = 0,this.object.options.weight * 
+			(this.config.withStrokeEffect == true ? 
+				(this.getProgress() > 0.5 ? 1-this.getProgress() : this.getProgress()) 
+				: 1);
+		if(this.config.fill == false) {
+			context.beginPath();
+			context.rect(0,0,this.object.options.width,this.object.options.height);
+			context.strokeStyle = this.object.options.backColor;
+			context.stroke();
+			context.closePath();
+
+			context.beginPath();
+			context.rect(left,top,width,height);
+			context.strokeStyle = this.object.options.frontColor;
+			context.stroke();
+		} else {
+			context.beginPath();
+			context.rect(0,0,this.object.options.width,this.object.options.height);
+			context.fillStyle = this.object.options.backColor;
+			context.closePath();
+			context.fill();
+
+			context.beginPath();
+			context.rect(left,top,width,height);
+			context.fillStyle = this.object.options.frontColor;
+			context.closePath();
+			context.fill();
+		}
+	}
+
+	RectangleEffect.prototype.getNextProgress = function() {
+		return this.object.getNextProgress(true);
+	};
+
+	RectangleEffect.prototype.setNextProgress = function() {
+		if(!this.object.options.standAlone)
+			this.setProgress(this.getNextProgress());
+		else
+			this.setProgress(this.getProgress() + CanvasLoading.config.rate/(this.object.options.animationTime*5));
+	};
+
+	RectangleEffect.prototype.setAndGetNextProgress = function() {
+		this.setNextProgress();
+		return this.getProgress();
+	};
+
+	RectangleEffect.prototype.setProgress = function(progress) {
+		if(progress > 1){
+			progress = 0;
+		}
+		this.object.setProgress(progress);
+	};
+
+	RectangleEffect.prototype.getProgress = function() {
+		return this.object.getProgress();
 	};
 }
 
@@ -466,10 +637,10 @@ function FullpageEffect(){
 			'bottom': 'auto'
 		}
 	}
-	var that;
+
+	var that = this;
 	FullpageEffect.prototype.init = function(object) {
-		that = this;
-		this.object = object;
+		this.object = this.object || object;
 		this.config = merge(this.config,this.object.options);
 
 		object.element.style.position 	= this.config.position.type;
@@ -479,14 +650,14 @@ function FullpageEffect(){
 		object.element.style.bottom 	= this.config.position.bottom;
 		object.element.style.width 		= this.config.width;
 		object.element.style.height 	= this.config.height;
-		//object.canvas.style.float = "none";
 
 		object.element.removeChild(object.element.getElementsByTagName('span')[0]);
+
+		that.resizeCanvas();
 	};
 
 	FullpageEffect.prototype.resizeCanvas = function(evt) {
 		var width = window.innerWidth;
-		that.object.canvas.width = width;
 		that.object.options.width = width;
 	};
 
@@ -522,12 +693,11 @@ function FullpageEffect(){
 	};
 
 	FullpageEffect.prototype.begin = function() {
-		//alert(this.object.title);
-		LOG("Loading Fullscreen va commencer!!")
+		LOG("Loading Fullscreen va commencer!!");
 	}
 
 	FullpageEffect.prototype.end = function() {
-		LOG("Loading Fullscreen va s'arrêter!!")
+		LOG("Loading Fullscreen va s'arrêter!!");
 	}
 
 	FullpageEffect.prototype.getNextProgress = function() {
