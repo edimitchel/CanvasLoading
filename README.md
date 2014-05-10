@@ -41,9 +41,9 @@ Follow steps but all aren't required (* required)
 	* CSS selector
 	* Options
 
-		var cl = new CanvasLoading("#loading", {
-			'standAlone' : false
-		});
+			var cl = new CanvasLoading("#loading", {
+				'standAlone' : false
+			});
 
 
 * Add options (see below) in class with format **cl-opt-*optName*:*optvalue* **
@@ -180,7 +180,7 @@ I've duplicate __this__ with the __that__ variable because I could use it in res
 
 I store the CanvasLoading object in my effect object for make it faster to writen.
 
-When i finish my effect, I hade it with the static method addEffect by entering a label and the Class reference.
+When i finish my effect, I add it with the static method addEffect by entering a label and the Class reference.
 
 __You can see the effect in entire in the code.__
 
