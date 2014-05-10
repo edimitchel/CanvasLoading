@@ -93,7 +93,12 @@ function CanvasLoading(selector, options) {
 	}
 
 	this.options = merge(CanvasLoading.defaults,options);
-	var htmlOptions = merge(options,this.getOptions());
+	this.getOptions();
+
+	if(this.options.hidden == true){
+		this.element.style.opacity = 0;
+	}
+
 	this.type = this.getType();
 	this.loop = false;
 
@@ -107,6 +112,8 @@ function CanvasLoading(selector, options) {
 	return true;
 }
 
+CanvasLoading.effects = {}
+
 CanvasLoading.config = {
 	'prefix' 			: 'cnvldg',
 	'prefixOptions'		: 'cl-opt',
@@ -117,24 +124,19 @@ CanvasLoading.config = {
 
 CanvasLoading.defaults = {
 	'standAlone'	: true,
-	'longer' 		: 10,
+	'width'			: 50,
+	'height'		: 50,
 	'weight' 		: 5,
 	'animationStart': true,
 	'animationEnd' 	: true,
 	'animationTime'	: 200,
 	'duration'		: false,
-	'width'			: 50,
-	'height'		: 50,
 	'clear'			: '#fff',
 	'backColor'		: '#eee',
-	'frontColor'	: '#333'
+	'frontColor'	: '#333',
+	'hidden' 		: true,
+	'length' 		: 10
 }
-
-CanvasLoading.TypesEffect = {
-	CIRCLE 		: 'CIRCLE',
-	RECTANGLE 	: 'RECTANGLE',
-	FULLPAGE 	: 'FULLPAGE'
-};
 
 CanvasLoading.prototype.init = function() {
 	this.canvas = document.createElement('canvas');
@@ -142,26 +144,35 @@ CanvasLoading.prototype.init = function() {
 
 	this.title = this.element.innerHTML;
 
-	var span = document.createElement('span');
-	span.className = CanvasLoading.config.prefix+CanvasLoading.config.delimiterPrefix+"title";
-	span.innerHTML = this.title;
+	var title = document.createElement(this.element.nodeName);
+	title.className = CanvasLoading.config.prefix+CanvasLoading.config.delimiterPrefix+"title";
+	title.innerHTML = this.title;
 
 	this.element.innerHTML = "";
 
 	this.element.appendChild(this.canvas);
-	this.element.appendChild(span);
+	this.element.appendChild(title);
 	this.context2D = this.canvas.getContext('2d');
 
-	this.effect.init(this);
+	if(this.options.hidden == true)
+		this.element.style.display = '';
+
+	if(!isNull(this.effect.init))
+		this.effect.init(this);
+	else {
+		throw new Error("Effect doesn't implement init method.");
+		return false;
+	}
 	this.resizeCanvas();
 	window.onresize = this.effect.resizeCanvas;
 };
 
 CanvasLoading.prototype.resizeCanvas = function() {
-	if(this.canvas.width != this.options.width)
-		this.canvas.width = this.options.width;
-	if(this.canvas.height != this.options.height)
+	// if(this.canvas.height != this.options.height)
 		this.canvas.height = this.options.height;
+	// if(this.canvas.width != this.options.width)
+		this.canvas.width = this.options.width;
+
 	this.options.radius = Math.max(0,this.options.width/2 - this.options.weight/2);
 	if(!isNull(this.effect.resizeCanvas))
 		this.effect.resizeCanvas();
@@ -281,7 +292,7 @@ CanvasLoading.prototype.paint = function() {
 		this.effect.paint(this.context2D);
 	else {
 		this.stop();
-		throw new Error("No paint implemented the "+this.type.toLowerCase()+" effect.");
+		throw new Error("Effect doesn't implement paint method.");
 	}
 }
 
@@ -292,16 +303,7 @@ CanvasLoading.prototype.getType = function() {
 		var ps = classes[i].search(CanvasLoading.config.prefix+CanvasLoading.config.delimiterPrefix);
 		if(ps > -1){
 			type = classes[i].substring((CanvasLoading.config.prefix+CanvasLoading.config.delimiterPrefix).length).toUpperCase();
-			var isGoodType = false;
-			for(var prop in CanvasLoading.TypesEffect) {
-			    if(CanvasLoading.TypesEffect[prop] === type) {
-			    	isGoodType = true;
-			    	break;
-			    }
-			}
-			if(isGoodType === false)
-				break;
-
+			
 			delete classes[i];
 			if(classes.length == 0)
 				this.element.removeAttribute("class");
@@ -314,17 +316,18 @@ CanvasLoading.prototype.getType = function() {
 };
 
 CanvasLoading.prototype.getLoadingEffect = function() {
-	switch(this.type){
-		case CanvasLoading.TypesEffect.CIRCLE :
-			return new CircleEffect();
-		break;
-		case CanvasLoading.TypesEffect.RECTANGLE :
-			return new RectangleEffect();
-		break;
-		case CanvasLoading.TypesEffect.FULLPAGE :
-			return new FullpageEffect();
-		break;
+	for(var i in CanvasLoading.effects) {
+		if(i == this.type)
+		{
+			return new CanvasLoading.effects[i];
+		}
 	}
+	throw new Error("The effect entered doesn't exist.");
+};
+
+CanvasLoading.addEffect = function(name,Class) {
+	CanvasLoading.effects[name.toUpperCase()] = Class;
+	return true;
 };
 
 CanvasLoading.prototype.getNextProgress = function(def) {
@@ -389,30 +392,10 @@ CanvasLoading.prototype.launchEnd = function() {
 		this.end();
 };
 
-CanvasLoading.prototype.launchEnd = function() {
-	if(this.end !== false)
-		this.end();
-};
-
 CanvasLoading.prototype.changeStandAloneState = function(standAlone) {
 	this.options.standAlone = standAlone;
 	this.show();
 };
-
-/*
- 	Effect Type Classes
- 	Must implement methods :
- 	- init(object) : Pass the Canvas Loading Objet for getting infos
- 	- resizeCanvas(event) : On resize and on load of document
- 	- paint(context) : Execute on paint
-
- 	Optional methods:
-	- begin : Started on begin of loading
-	- end : Started on end of loading
-	- getNextProgress : An extends of getNextProgress of CanvasLoading Object
-
-
-*/
 
 function CircleEffect(){
 	this.config = {
@@ -428,7 +411,6 @@ function CircleEffect(){
 		this.object = object;
 		this.config = merge(this.config,this.object.options);
 		this.context = object.context2D;
-
 	};
 
 	CircleEffect.prototype.resizeCanvas = function(obj) {};
@@ -519,6 +501,7 @@ function CircleEffect(){
 		return this.object.getProgress();
 	};
 }
+CanvasLoading.addEffect('circle',CircleEffect);
 
 function RectangleEffect(){
 	this.config = {
@@ -528,7 +511,7 @@ function RectangleEffect(){
 	var that = this;
 	RectangleEffect.prototype.init = function(object) {
 		this.object = object;
-		this.config = merge(this.object.options,this.config);
+		this.config = merge(this.config,this.object.options);
 	};
 
 	RectangleEffect.prototype.resizeCanvas = function(obj) {};
@@ -626,6 +609,7 @@ function RectangleEffect(){
 		return this.object.getProgress();
 	};
 }
+CanvasLoading.addEffect('rectangle',RectangleEffect);
 
 function FullpageEffect(){
 	this.config = {
@@ -727,3 +711,4 @@ function FullpageEffect(){
 		return this.object.getProgress();
 	};
 }
+CanvasLoading.addEffect('fullpage',FullpageEffect);

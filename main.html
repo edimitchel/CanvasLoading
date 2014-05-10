@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8">
+		<title>Canvas Loading</title>
+		<style>
+			html,body {
+				margin: 0;
+				padding: 0;
+			}
+			
+			#loading {
+				width: 750px;
+				height: 200px;
+				position: absolute;
+				left:50%;
+				top: 50%;
+				margin-left: -375px;
+				margin-top: -125px;
+				background-color: rgba(0,0,0,.1);
+				border-radius: 150px;
+			}
+			
+			#loading .cnvldg {
+				margin: 25px;
+				float:left;
+			}
+			
+			#loading .cnvldg-title {
+				font: 40px Helvetica,Arial,sans-serif;
+				line-height: 200px;
+				padding-left: 250px;
+			}
+
+		</style>
+	</head>
+	<body>
+		<div id="loading" class="cnvldg-circle cl-opt-weight:50 ">Hey bro', load you please!</div>
+
+		<script src="canvasloading.js"></script>
+		<script type="text/javascript">
+			var cl_c = new CanvasLoading('#loading', {
+				'width' : 150,	
+				'height' : 150	
+			});
+			setTimeout(function(){
+				cl_c.show(6000);
+			}, 500);
+		</script>
+	</body>
+</html>
